@@ -1,11 +1,13 @@
 version: 2
 
 jobs:
-  test:
+  rustlang:
     docker:
       - image: rust:1
+    working_directory: ~/learnings/rustlang
     steps:
-      - checkout
+      - checkout:
+          path: ~/learnings
       - run:
           name: Version information
           command: rustc --version; cargo --version; rustup --version
@@ -32,6 +34,6 @@ jobs:
 workflows:
   version: 2
 
-  publish_artifacts:
+  build:
     jobs:
-      - test
+      - rustlang

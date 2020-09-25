@@ -1,0 +1,1 @@
+# Learnings <a href="https://circleci.com/gh/alonn24/learnings" rel="some text">![statge](https://circleci.com/gh/alonn24/learnings.svg?style=svg)</a>
