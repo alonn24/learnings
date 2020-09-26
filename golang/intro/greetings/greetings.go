@@ -17,6 +17,7 @@ func Hello(name string) (string, error) {
 // Hellos - do something
 func Hellos(names ...string) (map[string]string, error) {
 	messages := make(map[string]string)
+	// loop over slice of names
 	for _, name := range names {
 		message, err := Hello(name)
 		if err != nil {

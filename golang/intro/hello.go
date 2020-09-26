@@ -6,11 +6,13 @@ import (
 	"log"
 )
 
-func main() {
-	log.SetPrefix("greetings: ")
-
+func hello() {
+	// Lambda
+	getNames := func() []string {
+		return []string{"Gladys", "Samantha", "Darrin"}
+	}
 	// slice of names
-	names := []string{"Gladys", "Samantha", "Darrin"}
+	names := getNames()
 	messages, err := greetings.Hellos(names...)
 	if err != nil {
 		log.Fatal(err)
