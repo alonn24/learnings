@@ -3,29 +3,39 @@ package greetings
 import (
 	"regexp"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/suite"
 )
 
-func TestHello(t *testing.T) {
-	name := "alony"
-	want := regexp.MustCompile(`\b` + name + `\b`)
-	msg, err := Hello(name)
-	if !want.MatchString(msg) || err != nil {
-		t.Fatalf(`Hello(%q) = %q, %v, want match for %#q, nil`, name, msg, err, want)
-	}
+type GreetingsTestSuite struct {
+	suite.Suite
+	name string
 }
 
-func TestHelloEmpty(t *testing.T) {
+func (suite *GreetingsTestSuite) SetupTest() {
+	// setup code
+}
+
+func (suite *GreetingsTestSuite) TestHello() {
+	msg, err := Hello("alony")
+	assert.Regexp(suite.T(), regexp.MustCompile(`\balony\b`), msg)
+	assert.Nil(suite.T(), err)
+}
+
+func (suite *GreetingsTestSuite) TestHelloEmpty() {
 	msg, err := Hello("")
-	if msg != "" || err == nil {
-		t.Fatalf(`Hello("") = %q, %v, want "", error`, msg, err)
-	}
+	assert.Equal(suite.T(), msg, "")
+	assert.NotNil(suite.T(), err)
 }
 
-func TestHellos(t *testing.T) {
-	name := "alony"
-	want := regexp.MustCompile(`\b` + name + `\b`)
-	ans, err := Hellos(name)
-	if !want.MatchString(ans[name]) || err != nil {
-		t.Fatalf(`Hello(%q) = %q, %v, want match for %#q, nil`, name, ans[name], err, want)
-	}
+func (suite *GreetingsTestSuite) TestHellos() {
+	ans, err := Hellos("alony")
+	assert.Len(suite.T(), ans, 1)
+	assert.Regexp(suite.T(), regexp.MustCompile(`\balony\b`), ans["alony"])
+	assert.Nil(suite.T(), err)
+}
+
+func TestGreetingsTestSuite(t *testing.T) {
+	suite.Run(t, new(GreetingsTestSuite))
 }
