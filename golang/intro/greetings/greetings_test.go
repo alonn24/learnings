@@ -1,33 +1,31 @@
 package greetings
 
-import "testing"
+import (
+	"regexp"
+	"testing"
+)
 
 func TestHello(t *testing.T) {
-	ans, err := Hello("alony")
-	if ans != "Hi, alony. Welcome!" {
-		t.Errorf("Hello(alony) = %v; want \"Hi, alony. Welcome!\"", ans)
-	}
-	if err != nil {
-		t.Error("Hello(alony) = expected err not to be nil")
+	name := "alony"
+	want := regexp.MustCompile(`\b` + name + `\b`)
+	msg, err := Hello(name)
+	if !want.MatchString(msg) || err != nil {
+		t.Fatalf(`Hello(%q) = %q, %v, want match for %#q, nil`, name, msg, err, want)
 	}
 }
 
 func TestHelloEmpty(t *testing.T) {
-	ans, err := Hello("")
-	if ans != "" {
-		t.Errorf("Hello(\"\") = %v; expected to return \"\"", ans)
-	}
-	if err == nil {
-		t.Errorf("Hello(\"\") = %v; to return error", ans)
+	msg, err := Hello("")
+	if msg != "" || err == nil {
+		t.Fatalf(`Hello("") = %q, %v, want "", error`, msg, err)
 	}
 }
 
 func TestHellos(t *testing.T) {
-	ans, err := Hellos("alony")
-	if err != nil {
-		t.Error("Hellos(alony), expected err not to be nil")
-	}
-	if ans["alony"] != "Hi, alony. Welcome!" {
-		t.Errorf("Hellos(alony) = %v, wanted \"Hi, alony. Welcome!\"", ans)
+	name := "alony"
+	want := regexp.MustCompile(`\b` + name + `\b`)
+	ans, err := Hellos(name)
+	if !want.MatchString(ans[name]) || err != nil {
+		t.Fatalf(`Hello(%q) = %q, %v, want match for %#q, nil`, name, ans[name], err, want)
 	}
 }
