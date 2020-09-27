@@ -5,9 +5,14 @@ type frame struct {
 	r2 int
 }
 
-func (frame frame) getScore() (score int, isStrike bool, isSpare bool) {
-	score = frame.r1 + frame.r2
-	isStrike = frame.r1 == 10
-	isSpare = !isStrike && score == 10
-	return
+func (frame frame) getScore() int {
+	return frame.r1 + frame.r2
+}
+
+func (frame frame) isStrike() bool {
+	return frame.r1 == 10
+}
+
+func (frame frame) isSpare() bool {
+	return !frame.isStrike() && frame.getScore() == 10
 }

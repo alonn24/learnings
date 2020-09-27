@@ -23,7 +23,7 @@ func (suite *BowlingTestSuite) TestCreation() {
 func (suite *BowlingTestSuite) TestUncompletedRoll() {
 	game := Game{}
 	game.roll(5)
-	assert.Equal(suite.T(), game.score(), 0)
+	assert.Equal(suite.T(), game.score(), 5)
 }
 
 func (suite *BowlingTestSuite) TestTwoRolls() {
@@ -43,14 +43,26 @@ func (suite *BowlingTestSuite) TestSpare() {
 	game := Game{}
 	game.roll(5).roll(5)
 	game.roll(2)
-	assert.Equal(suite.T(), game.score(), 10+2)
+	assert.Equal(suite.T(), game.score(), 14)
 }
 
 func (suite *BowlingTestSuite) TestStrike() {
 	game := Game{}
 	game.roll(10)
 	game.roll(2).roll(3)
-	assert.Equal(suite.T(), game.score(), 10+2+3)
+	assert.Equal(suite.T(), game.score(), 20)
+}
+
+func (suite *BowlingTestSuite) TestTwoStrikes() {
+	game := Game{}
+	game.roll(10).roll(10)
+	assert.Equal(suite.T(), game.score(), 30)
+}
+
+func (suite *BowlingTestSuite) TestTwoStrikesAndRoll() {
+	game := Game{}
+	game.roll(10).roll(10).roll(5)
+	assert.Equal(suite.T(), game.score(), 25+15+5)
 }
 
 func TestBowlingTestSuite(t *testing.T) {

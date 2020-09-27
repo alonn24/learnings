@@ -1,50 +1,59 @@
 package bowling
 
+// Game - bowling class game
 type Game struct {
 	frames []frame
 	index  int
 }
 
-func isNewTurn(game *Game) bool {
-	return len(game.frames) == game.index
-}
-
-func playFirstRoll(game *Game, score int) {
-	game.frames = append(game.frames, frame{})
-	game.frames[game.index].r1 = score
-}
-
-func playSecondRoll(game *Game, score int) {
-	game.frames[game.index].r2 = score
-	game.index++
-}
-
+// Roll
 func (game *Game) roll(score int) *Game {
-	if isNewTurn(game) {
-		playFirstRoll(game, score)
+	isNewTurn := len(game.frames) == game.index
+	if isNewTurn {
+		game.frames = append(game.frames, frame{})
+		game.frames[game.index].r1 = score
+		if score == 10 {
+			game.index++
+		}
 	} else {
-		playSecondRoll(game, score)
+		game.frames[game.index].r2 = score
+		game.index++
 	}
 	return game
 }
 
-func getRolls(game Game, i int) (int, int) {
-	if len(game.frames) > i+1 {
-		return game.frames[i+1].r1, game.frames[i+1].r2
+func getFrameAt(game Game, i int) *frame {
+	if len(game.frames) > i {
+		return &game.frames[i]
 	}
-	return 0, 0
+	return nil
 }
 
+func getNextRolls(game Game, i int) (int, int) {
+	nextFrame := getFrameAt(game, i+1)
+	next2Frame := getFrameAt(game, i+2)
+	if nextFrame == nil {
+		return 0, 0
+	}
+
+	r1 := nextFrame.r1
+	r2 := nextFrame.r2
+	if nextFrame.isStrike() && next2Frame != nil {
+		r2 = next2Frame.r1
+	}
+	return r1, r2
+}
+
+// Score
 func (game Game) score() int {
 	total := 0
-	for i := 0; i < game.index; i++ {
-		roll := game.frames[i]
-		nr1, nr2 := getRolls(game, i)
-		score, isStrike, isSpare := roll.getScore()
-		total += score
-		if isStrike {
+	for i := 0; i < len(game.frames); i++ {
+		frame := game.frames[i]
+		nr1, nr2 := getNextRolls(game, i)
+		total += frame.getScore()
+		if frame.isStrike() {
 			total += nr1 + nr2
-		} else if isSpare {
+		} else if frame.isSpare() {
 			total += nr1
 		}
 	}
