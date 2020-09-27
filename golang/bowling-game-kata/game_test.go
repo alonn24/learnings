@@ -65,6 +65,14 @@ func (suite *BowlingTestSuite) TestTwoStrikesAndRoll() {
 	assert.Equal(suite.T(), game.score(), 25+15+5)
 }
 
+func (suite *BowlingTestSuite) TestPerfectGame() {
+	game := Game{}
+	for i := 0; i < 12; i++ {
+		game.roll(10)
+	}
+	assert.Equal(suite.T(), 300, game.score())
+}
+
 func TestBowlingTestSuite(t *testing.T) {
 	suite.Run(t, new(BowlingTestSuite))
 }

@@ -1,29 +1,43 @@
 package bowling
 
-type frame struct {
+type frame interface {
+	getRolls() []int
+	roll(score int)
+	isStrike() bool
+	getScore() int
+	isSpare() bool
+	isDone() bool
+}
+
+/* singleFrame */
+type singleFrame struct {
 	rolls []int
 }
 
-func (frame *frame) roll(score int) {
-	frame.rolls = append(frame.rolls, score)
+func (singleFrame singleFrame) getRolls() []int {
+	return singleFrame.rolls
 }
 
-func (frame frame) isStrike() bool {
-	return (len(frame.rolls) == 1 && frame.rolls[0] == 10)
+func (singleFrame *singleFrame) roll(score int) {
+	singleFrame.rolls = append(singleFrame.rolls, score)
 }
 
-func (frame frame) getScore() int {
+func (singleFrame singleFrame) isStrike() bool {
+	return (len(singleFrame.rolls) == 1 && singleFrame.rolls[0] == 10)
+}
+
+func (singleFrame singleFrame) getScore() int {
 	sum := 0
-	for _, s := range frame.rolls {
+	for _, s := range singleFrame.rolls {
 		sum += s
 	}
 	return sum
 }
 
-func (frame frame) isSpare() bool {
-	return !frame.isStrike() && frame.getScore() == 10
+func (singleFrame singleFrame) isSpare() bool {
+	return !singleFrame.isStrike() && singleFrame.getScore() == 10
 }
 
-func (frame frame) isDone() bool {
-	return len(frame.rolls) == 2 || frame.isStrike()
+func (singleFrame singleFrame) isDone() bool {
+	return len(singleFrame.rolls) == 2 || singleFrame.isStrike()
 }

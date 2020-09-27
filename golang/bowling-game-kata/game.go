@@ -8,16 +8,16 @@ type Game struct {
 // Roll
 func (game *Game) roll(score int) *Game {
 	if len(game.frames) == 0 || game.frames[len(game.frames)-1].isDone() {
-		game.frames = append(game.frames, frame{})
+		game.frames = append(game.frames, &singleFrame{})
 	}
-	frame := &game.frames[len(game.frames)-1]
+	frame := game.frames[len(game.frames)-1]
 	frame.roll(score)
 	return game
 }
 
 func getRollsForFrame(game Game, i int) []int {
 	if len(game.frames) > i {
-		return game.frames[i].rolls
+		return game.frames[i].getRolls()
 	}
 	return []int{}
 }
