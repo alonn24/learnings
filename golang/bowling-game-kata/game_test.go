@@ -23,7 +23,7 @@ func (suite *BowlingTestSuite) TestCreation() {
 func (suite *BowlingTestSuite) TestUncompletedRoll() {
 	game := Game{}
 	game.roll(5)
-	assert.Equal(suite.T(), game.score(), 5)
+	assert.Equal(suite.T(), 5, game.score())
 }
 
 func (suite *BowlingTestSuite) TestTwoRolls() {

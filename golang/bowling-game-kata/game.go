@@ -3,22 +3,15 @@ package bowling
 // Game - bowling class game
 type Game struct {
 	frames []frame
-	index  int
 }
 
 // Roll
 func (game *Game) roll(score int) *Game {
-	isNewTurn := len(game.frames) == game.index
-	if isNewTurn {
+	if len(game.frames) == 0 || game.frames[len(game.frames)-1].isDone() {
 		game.frames = append(game.frames, frame{})
-		game.frames[game.index].r1 = score
-		if score == 10 {
-			game.index++
-		}
-	} else {
-		game.frames[game.index].r2 = score
-		game.index++
 	}
+	frame := &game.frames[len(game.frames)-1]
+	frame.roll(score)
 	return game
 }
 
@@ -36,10 +29,15 @@ func getNextRolls(game Game, i int) (int, int) {
 		return 0, 0
 	}
 
-	r1 := nextFrame.r1
-	r2 := nextFrame.r2
-	if nextFrame.isStrike() && next2Frame != nil {
-		r2 = next2Frame.r1
+	r1 := 0
+	r2 := 0
+	if len(nextFrame.rolls) >= 1 {
+		r1 = nextFrame.rolls[0]
+	}
+	if nextFrame.isStrike() && next2Frame != nil && len(next2Frame.rolls) >= 1 {
+		r2 = next2Frame.rolls[0]
+	} else if len(nextFrame.rolls) >= 2 {
+		r2 = nextFrame.rolls[1]
 	}
 	return r1, r2
 }
