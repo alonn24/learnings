@@ -5,10 +5,23 @@ type Game struct {
 	frames []frame
 }
 
+func isNewFrame(game *Game) bool {
+	return len(game.frames) == 0 || game.frames[len(game.frames)-1].isDone()
+}
+
+func addFrame(game *Game) *Game {
+	if len(game.frames) == 9 {
+		game.frames = append(game.frames, &lastFrame{})
+	} else {
+		game.frames = append(game.frames, &singleFrame{})
+	}
+	return game
+}
+
 // Roll
 func (game *Game) roll(score int) *Game {
-	if len(game.frames) == 0 || game.frames[len(game.frames)-1].isDone() {
-		game.frames = append(game.frames, &singleFrame{})
+	if isNewFrame(game) {
+		addFrame(game)
 	}
 	frame := game.frames[len(game.frames)-1]
 	frame.roll(score)

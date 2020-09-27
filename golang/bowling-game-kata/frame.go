@@ -41,3 +41,12 @@ func (singleFrame singleFrame) isSpare() bool {
 func (singleFrame singleFrame) isDone() bool {
 	return len(singleFrame.rolls) == 2 || singleFrame.isStrike()
 }
+
+/* lastFrame */
+type lastFrame struct {
+	singleFrame
+}
+
+func (lastFrame lastFrame) isDone() bool {
+	return len(lastFrame.rolls) == 3 || (len(lastFrame.rolls) == 2 && lastFrame.getScore() < 10)
+}
