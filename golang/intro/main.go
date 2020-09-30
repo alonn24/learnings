@@ -5,7 +5,9 @@ import (
 )
 
 func main() {
-	log.SetPrefix("main: ")
+	// log.SetPrefix("main: ")
+	log.SetFlags(0)
 	hello()
 	structures()
+	concurrency()
 }

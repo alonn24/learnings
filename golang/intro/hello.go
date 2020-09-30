@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"greetings"
 	"log"
 )
@@ -17,5 +16,5 @@ func hello() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(messages)
+	log.Printf("> hello: %v\n", messages)
 }

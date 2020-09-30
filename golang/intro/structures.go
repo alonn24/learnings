@@ -1,6 +1,6 @@
 package main
 
-import "fmt"
+import "log"
 
 type Shape interface {
 	Area() float64
@@ -22,5 +22,5 @@ func (r Rectangle) Perimeter() float64 {
 // Structures - Structures
 func structures() {
 	var r Shape = Rectangle{Length: 3, Width: 4}
-	fmt.Printf("Type of r: %T, Area: %v, Perimeter: %v.", r, r.Area(), r.Perimeter())
+	log.Printf("> structures: Type of r: %T, Area: %v, Perimeter: %v.\n", r, r.Area(), r.Perimeter())
 }

@@ -1,6 +1,6 @@
-module hello
+module main
 
-go 1.14
+go 1.15
 
 replace greetings => ./greetings
 
