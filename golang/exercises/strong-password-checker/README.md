@@ -1,4 +1,5 @@
 A password is considered strong if below conditions are all met:
+<a href="https://leetcode.com/problems/strong-password-checker/">excerise here</a>
 
 It has at least 6 characters and at most 20 characters.
 It must contain at least one lowercase letter, at least one uppercase letter, and at least one digit.
