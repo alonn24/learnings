@@ -1,102 +1,102 @@
 package checker
 
 import (
-	"errors"
 	"log"
 )
 
-func isDigit(c rune) bool {
-	return (c >= '0' && c <= '9')
+func isLower(c byte) bool {
+	return c >= 'a' && c <= 'z'
 }
 
-func isLowerCase(c rune) bool {
-	return (c >= 'a' && c <= 'z')
+func isUpper(c byte) bool {
+	return c >= 'A' && c <= 'Z'
 }
 
-func isUpperCase(c rune) bool {
-	return (c >= 'A' && c <= 'Z')
+func isDigit(c byte) bool {
+	return c >= '0' && c <= '9'
 }
 
-func analyze(s string) (int, int, error) {
-	missingLowerCase := 1
-	missingUpperCase := 1
-	missingDigits := 1
-	repeats := 0
-	var err error
-
-	repeating := 0
-	chars := []rune(s)
-	for i, c := range chars {
-		// repeats
-		if repeating == 0 {
-			repeating++
-		} else if chars[i-1] == c {
-			repeating++
-		} else {
-			repeating = 1
-		}
-		if repeating == 3 {
-			repeats++
-			repeating = 0
-		}
-
-		if isDigit(c) {
-			missingDigits = 0
-		} else if isLowerCase(c) {
-			missingLowerCase = 0
-		} else if isUpperCase(c) {
-			missingUpperCase = 0
-		} else {
-			err = errors.New("Bad input")
-		}
-	}
-	missingSpecia := missingLowerCase + missingUpperCase + missingDigits
-	return missingSpecia, repeats, err
-}
-
-const minLen = 6
-const maxLen = 20
-
-func min(a int, b int) int {
+func min(a, b int) int {
 	if a < b {
 		return a
 	}
 	return b
 }
 
-func limitZero(a int) int {
-	if a < 0 {
-		return 0
+func max(a, b int) int {
+	if a > b {
+		return a
 	}
-	return a
+	return b
 }
 
+func analyze(s string) (int, []int) {
+	missingLower := 1
+	missingUpper := 1
+	missingDigit := 1
+	repeats := make([]int, len(s))
+
+	for i := 0; i < len(s); {
+		c := s[i]
+		if isLower(c) {
+			missingLower = 0
+		} else if isUpper(c) {
+			missingUpper = 0
+		} else if isDigit(c) {
+			missingDigit = 0
+		}
+
+		f := i
+		for i < len(s) && s[i] == c {
+			i++
+		}
+		repeats[f] = i - f
+	}
+	return missingLower + missingUpper + missingDigit, repeats
+}
+
+const minLength = 6
+const maxLength = 20
+
 func strongPasswordChecker(s string) int {
-	missingSpecia, repeats, err := analyze(s)
-	insertions := limitZero(minLen - len([]rune(s)))
-	deletions := limitZero(len([]rune(s)) - 20)
-	if err != nil {
-		log.Printf("Error: %v\n", err)
+	missingSpecial, repeats := analyze(s)
+
+	// Insertions
+	if len(s) < 6 {
+		return max(missingSpecial, minLength-len(s))
+	}
+	// Deletions
+	deletions := max(len(s)-maxLength, 0)
+	log.Printf("%v deletions", deletions)
+
+	minChanges := deletions
+
+	// remove repeats by deletions
+	log.Printf("%v", s)
+	log.Printf("0 - %v", repeats)
+	for r := 1; r < 3; r++ {
+		for i := 0; i < len(repeats) && deletions > 0; i++ {
+			if repeats[i] >= 3 && repeats[i]%3 == (r-1) {
+				repeats[i] -= min(deletions, r)
+				deletions -= r
+			}
+		}
+		log.Printf("%v - %v", r, repeats)
 	}
 
-	log.Printf("%v special, %v repeats,%v inserts, %v deletions", missingSpecia, repeats, insertions, deletions)
+	// count replacing
+	replaces := 0
+	for i := 0; i < len(repeats); i++ {
+		if repeats[i] >= 3 && deletions > 0 {
+			temp := repeats[i] - 2
+			repeats[i] -= deletions
+			deletions -= temp
+		}
 
-	changes := 0
-	specialOverInserts := min(missingSpecia, insertions)
-	changes += specialOverInserts
-	missingSpecia = limitZero(missingSpecia - specialOverInserts)
-	insertions = limitZero(insertions - specialOverInserts)
+		if repeats[i] >= 3 {
+			replaces += repeats[i] / 3
+		}
+	}
 
-	specialOverRepeat := min(missingSpecia, repeats)
-	changes += specialOverRepeat
-	missingSpecia = limitZero(missingSpecia - specialOverRepeat)
-	repeats = limitZero(repeats - specialOverRepeat)
-
-	repeatOverDeletes := min(repeats, deletions)
-	changes += repeatOverDeletes
-	repeats = limitZero(repeats - repeatOverDeletes)
-	deletions = limitZero(deletions - repeatOverDeletes)
-
-	log.Printf("%v special, %v repeats,%v inserts, %v deletions, %v changes", missingSpecia, repeats, insertions, deletions, changes)
-	return deletions + insertions + missingSpecia + repeats + changes
+	return minChanges + max(missingSpecial, replaces)
 }

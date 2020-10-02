@@ -38,6 +38,11 @@ func (suit *CheckerTestSuit) TestChangeForSpecial() {
 func (suit *CheckerTestSuit) TestInsertOnly() {
 	assert.Equal(suit.T(), 3, strongPasswordChecker("aA1"))
 }
+func (suit *CheckerTestSuit) TestInsertToBreakRepeat() {
+	// aaAa12
+	// assert.Equal(suit.T(), 3, strongPasswordChecker("aaa"))
+	assert.Equal(suit.T(), 3, strongPasswordChecker("..."))
+}
 
 func (suit *CheckerTestSuit) TestInsertOverSpecial() {
 	assert.Equal(suit.T(), 3, strongPasswordChecker("abc"))
@@ -58,7 +63,7 @@ func (suit *CheckerTestSuit) TestDeleteAndChange() {
 }
 
 func (suit *CheckerTestSuit) TestMultipleRepeatingWithDelete() {
-	// aaAaa1aa1aa1aa1aa1aa - 6
+	// aa[a-A]aa[a-1]aa[a-1]aa[a-1]aa[a-1]aa[a-1]aa - 6
 	assert.Equal(suit.T(), 6, strongPasswordChecker("aaaaaaaaaaaaaaaaaaaa"))
 }
 
@@ -67,6 +72,21 @@ func (suit *CheckerTestSuit) TestDeleteToFixRepeat() {
 	assert.Equal(suit.T(), 6, strongPasswordChecker("aaabbbaaabbbaaabbbaaAAB123"))
 	// aa[a]bb[b]aa[a]bb[b]aa[a]bb[b]aaAAA111
 	assert.Equal(suit.T(), 6+2, strongPasswordChecker("aaabbbaaabbbaaabbbaaAAA111"))
+}
+
+func (suit *CheckerTestSuit) TestDelete2InARow() {
+	// 1Abababcaa[-aa]bababababa
+	assert.Equal(suit.T(), 2, strongPasswordChecker("1Abababcaaaabababababa"))
+}
+
+func (suit *CheckerTestSuit) TestChangeAndDeletionsToRemoveRepeats() {
+	// aa[a-T]abbaa[-a]bbaa[-]a123456A
+	assert.Equal(suit.T(), 3, strongPasswordChecker("aaaabbaaabbaaa123456A"))
+}
+
+func (suit *CheckerTestSuit) TestRemove4Repeats() {
+	// aa[-aaaa]1234567890123Ubefg
+	assert.Equal(suit.T(), 4, strongPasswordChecker("aaaaaa1234567890123Ubefg"))
 }
 
 func TestCheckerTestSuit(t *testing.T) {
