@@ -13,7 +13,7 @@ func isIn(c rune, arr []rune) bool {
 	return false
 }
 
-func takeUntil(s string, c []rune) (string, string) {
+func takeWhile(s string, c []rune) (string, string) {
 	chars := []rune(s)
 	for i := 0; i < len(chars); i++ {
 		if !isIn(chars[i], c) {
@@ -33,12 +33,12 @@ const maxInt = float64(maxUint >> 1)
 const minInt = (float64(maxUint>>1) + 1) * -1
 
 func myAtoi(s string) int {
-	_, withoutSpaces := takeUntil(s, []rune{' '})
-	plusOrMinus, rest := takeUntil(withoutSpaces, []rune{'-', '+'})
+	_, withoutSpaces := takeWhile(s, []rune{' '})
+	plusOrMinus, rest := takeWhile(withoutSpaces, []rune{'-', '+'})
 	if len(plusOrMinus) > 1 {
 		return 0
 	}
-	number, _ := takeUntil(rest, []rune{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'})
+	number, _ := takeWhile(rest, []rune{'0', '1', '2', '3', '4', '5', '6', '7', '8', '9'})
 
 	res := float64(0)
 
