@@ -3,7 +3,7 @@ from tree_to_string import treeToString
 from balance_tree import balanceTree
 
 
-def test_height():
+def test_treeToString():
     root = BinaryTreeNode(4, BinaryTreeNode(
         3, BinaryTreeNode(2, BinaryTreeNode(1))))
     assert treeToString(root) == "4(3(2(1)))"
