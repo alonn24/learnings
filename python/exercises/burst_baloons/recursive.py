@@ -30,11 +30,11 @@ def baloonBurstDP(nums: List[int]) -> int:
             left = dp[i][k]
             right = dp[k][j]
             result = max(result, left + nums[i]*nums[k]*nums[j] + right)
-        print(i, j, '->', result)
+
         dp[i][j] = result
 
-    for i in range(2, n):
-        for j in range(0, n-i):
+    for i in range(2, n):  # number of items 3,4,5
+        for j in range(0, n-i):  # start index limited by out of bounds
             add_to_dp(j, j+i)
     return dp[0][n-1]
 
