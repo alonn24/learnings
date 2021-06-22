@@ -14,3 +14,4 @@ def test_recursion():
 def test_timeLimmit():
     assert solution.maxCoins(
         [2, 4, 8, 4, 0, 7, 8, 9, 1, 2, 4, 7, 1, 7, 3, 6]) == 3304
+    # assert solution.maxCoins([x for x in range(1000)]) == 10
