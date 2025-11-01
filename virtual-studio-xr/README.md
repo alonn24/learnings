@@ -14,11 +14,12 @@ This README is written so you can:
 ## Table of Contents
 1. [Overview](#overview)
 2. [Prerequisites](#prerequisites)
-3. [Week 1 – Project Setup & Basic WebXR Scene](#week-1--project-setup--basic-webxr-scene)
-4. [Week 2 – Interaction & Controllers](#week-2--interaction--controllers)
-5. [Week 3 – AR, Lighting, and Physics](#week-3--ar-lighting-and-physics)
-6. [Week 4 – XR UI, Scene Persistence, Deployment](#week-4--xr-ui-scene-persistence-deployment)
-7. [Next Steps](#next-steps)
+3. [Recommended Tools & Extensions](#recommended-tools--extensions)
+4. [Week 1 – Project Setup & Basic WebXR Scene](#week-1--project-setup--basic-webxr-scene)
+5. [Week 2 – Interaction & Controllers](#week-2--interaction--controllers)
+6. [Week 3 – AR, Lighting, and Physics](#week-3--ar-lighting-and-physics)
+7. [Week 4 – XR UI, Scene Persistence, Deployment](#week-4--xr-ui-scene-persistence-deployment)
+8. [Next Steps](#next-steps)
 
 ---
 
@@ -42,13 +43,242 @@ Each week:
 
 ## Prerequisites
 
-- Node.js ≥ 18
-- npm ≥ 9
+- Node.js ≥ 22.20.0
+- npm ≥ 10
 - Basic familiarity with:
   - modules (`import` / `export`)
   - async / event-based code
   - 3D coordinate systems (optional but helps)
 - A device that can open `https://...` over HTTPS (for WebXR in real headset)
+
+---
+
+## Recommended Tools & Extensions
+
+### Browser Extensions
+
+#### Chrome/Edge Extensions for WebXR Development
+
+1. **WebXR API Emulator**
+   - **Install**: [Chrome Web Store](https://chromewebstore.google.com/detail/webxr-api-emulator/mjddjgeghkdijejnciaefnkjmkafnnje)
+   - **Purpose**: Emulate WebXR devices (headsets, controllers) in desktop browser
+   - **Features**:
+     - Simulate VR/AR sessions without a physical headset
+     - Test controller inputs with keyboard/mouse
+     - Switch between different headset types (Quest, Vive, etc.)
+     - Adjust FOV, IPD, and other headset properties
+   - **Usage**: Essential for development when you don't have constant access to a physical headset
+
+2. **Three.js Developer Tools**
+   - **Install**: [Chrome Web Store](https://chromewebstore.google.com/detail/threejs-developer-tools/ebpnegggocnnhleeicgljbedjkganaek)
+   - **Purpose**: Debug Three.js scenes directly in DevTools
+   - **Features**:
+     - Inspect scene graph hierarchy
+     - View mesh, material, and geometry properties
+     - Monitor performance metrics
+     - Toggle object visibility
+     - Real-time property editing
+
+3. **Immersive Web Emulator**
+   - **Install**: [Chrome Web Store](https://chromewebstore.google.com/detail/immersive-web-emulator/cgffilbpcibhmcfbgggfhfolhkfbhmik)
+   - **Purpose**: Alternative WebXR emulator with different features
+   - **Features**:
+     - Device emulation for testing
+     - Room-scale tracking simulation
+     - Hand tracking emulation
+
+---
+
+### Development Tools
+
+#### IDE Extensions (for Cursor/VS Code)
+
+1. **Three.js Snippets**
+   - Autocomplete for Three.js classes and methods
+   - Code snippets for common patterns
+
+2. **GLSL Lint**
+   - Syntax highlighting for shader code
+   - Error checking for GLSL
+
+3. **Live Server** (if not using Vite's dev server)
+   - Serves your app over HTTPS (required for WebXR)
+   - Auto-reload on file changes
+
+#### Command-line Tools
+
+1. **nvm** (Node Version Manager)
+   - **Install**: [nvm installation guide](https://github.com/nvm-sh/nvm)
+   - **Usage**: `nvm use` in project directory (reads `.nvmrc`)
+   - **Purpose**: Ensures consistent Node.js version across team
+
+2. **serve** (for testing production builds)
+   ```bash
+   npm install -g serve
+   serve -s dist -l 5000 --ssl-cert cert.pem --ssl-key key.pem
+   ```
+
+3. **mkcert** (for local HTTPS)
+   ```bash
+   # Install mkcert
+   brew install mkcert  # macOS
+   choco install mkcert # Windows
+   
+   # Create local CA
+   mkcert -install
+   
+   # Generate certificates
+   mkcert localhost 127.0.0.1 ::1
+   ```
+
+---
+
+### Testing & Debugging Tools
+
+#### Browser DevTools Tips for WebXR
+
+1. **Remote Debugging** (for testing on Quest/other headsets)
+   - **Quest**: Connect via USB, enable developer mode, use `chrome://inspect`
+   - **Purpose**: Debug your WebXR app running on actual device
+   - **Setup**:
+     ```bash
+     adb devices  # Verify device connection
+     # Open chrome://inspect in desktop Chrome
+     # Your device's browser tabs will appear
+     ```
+
+2. **Performance Monitor**
+   - Press `Ctrl+Shift+P` (Chrome DevTools)
+   - Type "Show Performance Monitor"
+   - Monitor FPS, CPU, memory in real-time
+
+3. **WebXR Device Logging**
+   - Check `about:gpu` for WebGL/WebGPU capabilities
+   - Check `chrome://device-log` for XR device events
+
+#### Testing Frameworks
+
+1. **Playwright** (for automated testing)
+   ```bash
+   npm install -D @playwright/test
+   ```
+   - Can test WebXR flows programmatically
+   - Supports headless testing
+
+2. **WebXR Test API** (experimental)
+   - Part of WebXR spec for automated testing
+   - Not yet widely supported
+
+---
+
+### Recommended NPM Packages
+
+#### Essential for this course:
+- ✅ `three` - 3D engine
+- ✅ `@types/three` - TypeScript definitions
+- ✅ `vite` - Build tool
+- ✅ `cannon-es` - Physics engine (Week 3)
+
+#### Optional but helpful:
+
+1. **three-mesh-ui**
+   ```bash
+   npm install three-mesh-ui
+   ```
+   - Better 3D UI components than basic meshes
+   - Proper text rendering, buttons, panels
+
+2. **@theatre/core + @theatre/studio**
+   ```bash
+   npm install @theatre/core @theatre/studio
+   ```
+   - Animation and sequencing tool
+   - Visual timeline editor
+
+3. **leva**
+   ```bash
+   npm install leva
+   ```
+   - GUI controls for tweaking parameters during development
+   - Works great for material/light adjustments
+
+4. **stats.js** (included in Three.js examples)
+   ```typescript
+   import Stats from 'three/examples/jsm/libs/stats.module.js';
+   ```
+   - FPS/memory monitor overlay
+   - Essential for performance optimization
+
+5. **drei** (React Three Fiber ecosystem - if using React)
+   - Pre-built helpers and abstractions
+   - Not covered in this course (pure Three.js)
+
+---
+
+### Hardware Recommendations
+
+#### For Testing
+
+1. **Meta Quest 3 / Quest Pro**
+   - Best developer experience
+   - Built-in browser with excellent WebXR support
+   - USB-C connection for remote debugging
+
+2. **Meta Quest 2**
+   - More affordable option
+   - Good WebXR support
+   - Large user base
+
+3. **Phone with ARCore/ARKit** (for AR testing)
+   - Modern Android (ARCore) or iPhone (ARKit)
+   - Chrome or Safari with WebXR support
+
+#### Development Hardware
+
+1. **Good GPU** (NVIDIA RTX 3060+ or equivalent)
+   - Smooth development experience
+   - Faster build times
+   - Better preview rendering
+
+2. **USB-C Cable** (for Quest debugging)
+   - Link Cable or quality USB-C 3.0 cable
+   - For `adb` connection and remote debugging
+
+---
+
+### Learning & Reference Resources
+
+1. **WebXR Device API Spec**
+   - https://immersiveweb.dev/
+   - Official specs and examples
+
+2. **Three.js Documentation**
+   - https://threejs.org/docs/
+   - Examples: https://threejs.org/examples/
+
+3. **WebXR Samples**
+   - https://immersive-web.github.io/webxr-samples/
+   - Real working examples of WebXR features
+
+4. **Three.js Journey** (paid course)
+   - https://threejs-journey.com/
+   - Excellent for deep Three.js knowledge
+
+5. **Mozilla WebXR Guide**
+   - https://developer.mozilla.org/en-US/docs/Web/API/WebXR_Device_API
+   - Comprehensive WebXR documentation
+
+---
+
+### Quick Setup Checklist
+
+Before starting Week 1:
+- [ ] Install Node.js 22.20.0 (use `nvm`)
+- [ ] Install **WebXR API Emulator** Chrome extension
+- [ ] Install **Three.js Developer Tools** Chrome extension
+- [ ] Set up HTTPS for local development (optional for Week 1, required for device testing)
+- [ ] If you have a Quest: Enable Developer Mode and set up `adb`
+- [ ] Clone/create project and run `npm install`
 
 ---
 
