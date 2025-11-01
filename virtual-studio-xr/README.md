@@ -19,7 +19,12 @@ This README is written so you can:
 5. [Week 2 – Interaction & Controllers](#week-2--interaction--controllers)
 6. [Week 3 – AR, Lighting, and Physics](#week-3--ar-lighting-and-physics)
 7. [Week 4 – XR UI, Scene Persistence, Deployment](#week-4--xr-ui-scene-persistence-deployment)
-8. [Next Steps](#next-steps)
+8. [Week 5 – Spatial Audio & Voice Commands](#week-5--spatial-audio--voice-commands)
+9. [Week 6 – Networking & Multi-user XR](#week-6--networking--multi-user-xr)
+10. [Week 7 – Asset Pipeline & Optimization](#week-7--asset-pipeline--optimization)
+11. [Week 8 – UX & Accessibility in XR](#week-8--ux--accessibility-in-xr)
+12. [Deployment Notes](#deployment-notes)
+13. [Next Steps](#next-steps)
 
 ---
 
@@ -1069,6 +1074,1732 @@ Requirements:
 - integrate the menu into main.ts and hook the callbacks to scene/state logic
 - keep the project modular (scene/, managers/, physics/, ar/, ui/, state/)
 - code must remain in TypeScript
+```
+
+---
+
+## Week 5 – Spatial Audio & Voice Commands
+
+### Goal
+
+Add **immersive audio** to the scene and enable **voice-based interaction** for hands-free control.
+
+### What you will learn
+
+* WebAudio API and positional audio in Three.js
+* Creating audio sources that respond to distance and orientation
+* Web Speech API for voice recognition
+* Command parsing and scene control via voice
+* Audio feedback for user actions
+
+### Expected result
+
+* Background ambient audio
+* 3D positional sound sources attached to objects
+* Voice commands like "add cube", "change color red", "save scene"
+* Audio feedback when actions complete
+
+---
+
+### 1. New folders / files
+
+```text
+src/
+  audio/
+    AudioManager.ts
+    SpatialAudioSource.ts
+  voice/
+    VoiceCommandManager.ts
+```
+
+---
+
+### 2. Install audio assets (optional)
+
+For this week, you can use:
+- Web-generated tones
+- Public domain audio from [Freesound.org](https://freesound.org)
+- Procedural audio via Web Audio API
+
+---
+
+### 3. `src/audio/AudioManager.ts`
+
+```ts
+// src/audio/AudioManager.ts
+import * as THREE from 'three';
+
+export class AudioManager {
+  private listener: THREE.AudioListener;
+  private audioLoader: THREE.AudioLoader;
+  private sounds: Map<string, THREE.Audio> = new Map();
+
+  constructor(camera: THREE.PerspectiveCamera) {
+    this.listener = new THREE.AudioListener();
+    camera.add(this.listener);
+    this.audioLoader = new THREE.AudioLoader();
+  }
+
+  async loadSound(name: string, url: string): Promise<THREE.Audio> {
+    return new Promise((resolve, reject) => {
+      const sound = new THREE.Audio(this.listener);
+      this.audioLoader.load(
+        url,
+        (buffer) => {
+          sound.setBuffer(buffer);
+          this.sounds.set(name, sound);
+          resolve(sound);
+        },
+        undefined,
+        reject
+      );
+    });
+  }
+
+  playSound(name: string, loop = false, volume = 1) {
+    const sound = this.sounds.get(name);
+    if (sound && !sound.isPlaying) {
+      sound.setLoop(loop);
+      sound.setVolume(volume);
+      sound.play();
+    }
+  }
+
+  stopSound(name: string) {
+    const sound = this.sounds.get(name);
+    if (sound && sound.isPlaying) {
+      sound.stop();
+    }
+  }
+
+  // Create simple tone feedback
+  createBeep(frequency = 440, duration = 0.1) {
+    const context = this.listener.context;
+    const oscillator = context.createOscillator();
+    const gainNode = context.createGain();
+
+    oscillator.connect(gainNode);
+    gainNode.connect(context.destination);
+
+    oscillator.frequency.value = frequency;
+    oscillator.type = 'sine';
+
+    gainNode.gain.setValueAtTime(0.3, context.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.01, context.currentTime + duration);
+
+    oscillator.start(context.currentTime);
+    oscillator.stop(context.currentTime + duration);
+  }
+}
+```
+
+---
+
+### 4. `src/audio/SpatialAudioSource.ts`
+
+```ts
+// src/audio/SpatialAudioSource.ts
+import * as THREE from 'three';
+
+export class SpatialAudioSource {
+  private positionalAudio: THREE.PositionalAudio;
+
+  constructor(
+    listener: THREE.AudioListener,
+    mesh: THREE.Object3D,
+    audioBuffer: AudioBuffer
+  ) {
+    this.positionalAudio = new THREE.PositionalAudio(listener);
+    this.positionalAudio.setBuffer(audioBuffer);
+    this.positionalAudio.setRefDistance(1);
+    this.positionalAudio.setRolloffFactor(1);
+    this.positionalAudio.setDistanceModel('inverse');
+    this.positionalAudio.setLoop(true);
+
+    mesh.add(this.positionalAudio);
+  }
+
+  play() {
+    if (!this.positionalAudio.isPlaying) {
+      this.positionalAudio.play();
+    }
+  }
+
+  stop() {
+    if (this.positionalAudio.isPlaying) {
+      this.positionalAudio.stop();
+    }
+  }
+
+  setVolume(volume: number) {
+    this.positionalAudio.setVolume(volume);
+  }
+}
+```
+
+---
+
+### 5. `src/voice/VoiceCommandManager.ts`
+
+```ts
+// src/voice/VoiceCommandManager.ts
+export type VoiceCommand = {
+  phrase: string;
+  action: () => void;
+};
+
+export class VoiceCommandManager {
+  private recognition: SpeechRecognition | null = null;
+  private commands: VoiceCommand[] = [];
+  private isListening = false;
+
+  constructor() {
+    // Check for browser support
+    const SpeechRecognition = 
+      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+
+    if (SpeechRecognition) {
+      this.recognition = new SpeechRecognition();
+      this.recognition.continuous = true;
+      this.recognition.interimResults = false;
+      this.recognition.lang = 'en-US';
+
+      this.recognition.onresult = (event) => {
+        const last = event.results.length - 1;
+        const transcript = event.results[last][0].transcript.toLowerCase().trim();
+        console.log('Heard:', transcript);
+        this.processCommand(transcript);
+      };
+
+      this.recognition.onerror = (event) => {
+        console.error('Speech recognition error:', event.error);
+      };
+    } else {
+      console.warn('Speech Recognition not supported in this browser');
+    }
+  }
+
+  registerCommand(phrase: string, action: () => void) {
+    this.commands.push({ phrase: phrase.toLowerCase(), action });
+  }
+
+  private processCommand(transcript: string) {
+    for (const command of this.commands) {
+      if (transcript.includes(command.phrase)) {
+        console.log('Executing command:', command.phrase);
+        command.action();
+        return;
+      }
+    }
+  }
+
+  startListening() {
+    if (this.recognition && !this.isListening) {
+      this.recognition.start();
+      this.isListening = true;
+      console.log('Voice recognition started');
+    }
+  }
+
+  stopListening() {
+    if (this.recognition && this.isListening) {
+      this.recognition.stop();
+      this.isListening = false;
+      console.log('Voice recognition stopped');
+    }
+  }
+}
+```
+
+---
+
+### 6. Update `src/main.ts` (Week 5 version)
+
+```ts
+// src/main.ts (Week 5)
+import * as THREE from 'three';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { setupScene } from './scene/setupScene';
+import { createMultipleObjects } from './scene/createMultipleObjects';
+import { setupResizeHandler } from './utils/resizeHandler';
+import { InteractionManager } from './managers/InteractionManager';
+import { PhysicsManager } from './physics/PhysicsManager';
+import { enableAR } from './ar/setupAR';
+import { SceneStateManager } from './state/SceneStateManager';
+import { createXRMenu } from './ui/XRMenu';
+import { AudioManager } from './audio/AudioManager';
+import { VoiceCommandManager } from './voice/VoiceCommandManager';
+
+function main() {
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+  document.body.appendChild(VRButton.createButton(renderer));
+  enableAR(renderer);
+
+  const { scene, camera } = setupScene();
+  const objects = createMultipleObjects(scene);
+
+  const interactionManager = new InteractionManager(scene, camera, renderer);
+  interactionManager.setInteractable(objects);
+
+  const physicsManager = new PhysicsManager();
+  objects.forEach((obj) => {
+    if (obj instanceof THREE.Mesh) {
+      physicsManager.addMeshWithPhysics(obj);
+    }
+  });
+
+  const stateManager = new SceneStateManager();
+  const audioManager = new AudioManager(camera);
+
+  // Set up voice commands
+  const voiceManager = new VoiceCommandManager();
+  
+  voiceManager.registerCommand('add cube', () => {
+    console.log('Adding cube via voice');
+    audioManager.createBeep(440, 0.1);
+    // Add cube logic here
+  });
+
+  voiceManager.registerCommand('change color red', () => {
+    console.log('Changing color to red');
+    audioManager.createBeep(550, 0.1);
+    objects[0].material.color.setHex(0xff0000);
+  });
+
+  voiceManager.registerCommand('save scene', () => {
+    console.log('Saving scene via voice');
+    audioManager.createBeep(660, 0.1);
+    const meshes = scene.children.filter((c) => c instanceof THREE.Mesh) as THREE.Mesh[];
+    stateManager.save(meshes);
+  });
+
+  // Button to start voice recognition (requires user gesture)
+  const voiceButton = document.createElement('button');
+  voiceButton.textContent = 'Start Voice Commands';
+  voiceButton.style.position = 'absolute';
+  voiceButton.style.top = '10px';
+  voiceButton.style.left = '10px';
+  voiceButton.style.padding = '10px';
+  voiceButton.style.zIndex = '1000';
+  voiceButton.onclick = () => {
+    voiceManager.startListening();
+    voiceButton.textContent = 'Voice Listening...';
+    voiceButton.disabled = true;
+  };
+  document.body.appendChild(voiceButton);
+
+  const menu = createXRMenu({
+    onAdd: () => {
+      audioManager.createBeep(440, 0.1);
+    },
+    onReset: () => {
+      audioManager.createBeep(220, 0.2);
+    },
+    onSave: () => {
+      audioManager.createBeep(880, 0.1);
+      const meshes = scene.children.filter((c) => c instanceof THREE.Mesh) as THREE.Mesh[];
+      stateManager.save(meshes);
+    },
+  });
+  scene.add(menu);
+
+  setupResizeHandler(camera, renderer);
+
+  const clock = new THREE.Clock();
+  renderer.setAnimationLoop(() => {
+    const delta = clock.getDelta();
+    physicsManager.update(delta);
+    renderer.render(scene, camera);
+  });
+}
+
+main();
+```
+
+---
+
+### 7. Cursor prompt (Week 5)
+
+```text
+Extend the WebXR TS project to include spatial audio and voice commands.
+
+Requirements:
+- add src/audio/AudioManager.ts for managing audio sources and creating feedback sounds
+- add src/audio/SpatialAudioSource.ts for 3D positional audio
+- add src/voice/VoiceCommandManager.ts using Web Speech API for voice recognition
+- register voice commands: "add cube", "change color red", "save scene"
+- add audio feedback beeps when commands execute
+- add a button to start voice recognition (requires user gesture)
+- integrate AudioManager and VoiceCommandManager into main.ts
+- keep the project modular (audio/, voice/, scene/, managers/, physics/, ar/, ui/, state/)
+```
+
+---
+
+## Week 6 – Networking & Multi-user XR
+
+### Goal
+
+Enable **multiple users** to share the same XR space, see each other's avatars, and interact with shared objects in real-time.
+
+### What you will learn
+
+* WebSocket communication for real-time updates
+* Broadcasting position/rotation of users and objects
+* Creating simple avatar representations
+* Handling network latency and state synchronization
+* Optional: WebRTC for peer-to-peer communication
+
+### Expected result
+
+* Multiple users can join the same session
+* Each user sees others as simple avatar meshes
+* Shared object manipulation (pick up object → everyone sees it move)
+* User ID/name display above avatars
+
+---
+
+### 1. Install networking dependencies
+
+```bash
+npm install socket.io-client
+npm install -D @types/socket.io-client
+```
+
+For a simple local server, you can use:
+```bash
+npm install socket.io express
+```
+
+---
+
+### 2. New folders / files
+
+```text
+src/
+  networking/
+    NetworkManager.ts
+    Avatar.ts
+server/
+  server.js  (simple Node.js WebSocket server)
+```
+
+---
+
+### 3. Simple WebSocket server (`server/server.js`)
+
+```js
+// server/server.js
+const express = require('express');
+const { createServer } = require('http');
+const { Server } = require('socket.io');
+
+const app = express();
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: {
+    origin: '*',
+  },
+});
+
+const users = new Map();
+
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+
+  socket.on('join', (userData) => {
+    users.set(socket.id, {
+      id: socket.id,
+      name: userData.name || `User_${socket.id.slice(0, 4)}`,
+      position: { x: 0, y: 1.6, z: 0 },
+      rotation: { x: 0, y: 0, z: 0 },
+    });
+
+    // Send existing users to new user
+    socket.emit('existing-users', Array.from(users.values()));
+
+    // Broadcast new user to others
+    socket.broadcast.emit('user-joined', users.get(socket.id));
+  });
+
+  socket.on('update-position', (data) => {
+    const user = users.get(socket.id);
+    if (user) {
+      user.position = data.position;
+      user.rotation = data.rotation;
+      socket.broadcast.emit('user-moved', {
+        id: socket.id,
+        position: data.position,
+        rotation: data.rotation,
+      });
+    }
+  });
+
+  socket.on('object-moved', (data) => {
+    socket.broadcast.emit('object-moved', data);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+    users.delete(socket.id);
+    socket.broadcast.emit('user-left', socket.id);
+  });
+});
+
+httpServer.listen(3000, () => {
+  console.log('Socket.io server running on http://localhost:3000');
+});
+```
+
+---
+
+### 4. `src/networking/Avatar.ts`
+
+```ts
+// src/networking/Avatar.ts
+import * as THREE from 'three';
+
+export class Avatar {
+  public mesh: THREE.Group;
+  private nameLabel: THREE.Sprite | null = null;
+
+  constructor(public userId: string, public userName: string) {
+    this.mesh = new THREE.Group();
+
+    // Simple avatar: head + body
+    const headGeo = new THREE.SphereGeometry(0.15, 16, 16);
+    const bodyGeo = new THREE.CylinderGeometry(0.15, 0.2, 0.6, 16);
+    const material = new THREE.MeshStandardMaterial({ color: 0x3388ff });
+
+    const head = new THREE.Mesh(headGeo, material);
+    head.position.y = 0.75;
+
+    const body = new THREE.Mesh(bodyGeo, material);
+    body.position.y = 0.3;
+
+    this.mesh.add(head);
+    this.mesh.add(body);
+
+    // Optional: add name label above head
+    this.createNameLabel(userName);
+  }
+
+  private createNameLabel(name: string) {
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d')!;
+    canvas.width = 256;
+    canvas.height = 64;
+
+    context.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+
+    context.font = '32px Arial';
+    context.fillStyle = 'white';
+    context.textAlign = 'center';
+    context.fillText(name, 128, 42);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMaterial = new THREE.SpriteMaterial({ map: texture });
+    this.nameLabel = new THREE.Sprite(spriteMaterial);
+    this.nameLabel.scale.set(1, 0.25, 1);
+    this.nameLabel.position.y = 1.2;
+
+    this.mesh.add(this.nameLabel);
+  }
+
+  updatePosition(position: { x: number; y: number; z: number }) {
+    this.mesh.position.set(position.x, position.y, position.z);
+  }
+
+  updateRotation(rotation: { x: number; y: number; z: number }) {
+    this.mesh.rotation.set(rotation.x, rotation.y, rotation.z);
+  }
+}
+```
+
+---
+
+### 5. `src/networking/NetworkManager.ts`
+
+```ts
+// src/networking/NetworkManager.ts
+import { io, Socket } from 'socket.io-client';
+import * as THREE from 'three';
+import { Avatar } from './Avatar';
+
+export class NetworkManager {
+  private socket: Socket;
+  private avatars: Map<string, Avatar> = new Map();
+  private scene: THREE.Scene;
+  private localCamera: THREE.PerspectiveCamera;
+
+  constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera, serverUrl = 'http://localhost:3000') {
+    this.scene = scene;
+    this.localCamera = camera;
+    this.socket = io(serverUrl);
+
+    this.setupSocketListeners();
+  }
+
+  private setupSocketListeners() {
+    this.socket.on('connect', () => {
+      console.log('Connected to server:', this.socket.id);
+      this.socket.emit('join', { name: `User_${Date.now()}` });
+    });
+
+    this.socket.on('existing-users', (users: any[]) => {
+      users.forEach((user) => {
+        if (user.id !== this.socket.id) {
+          this.createAvatar(user.id, user.name, user.position, user.rotation);
+        }
+      });
+    });
+
+    this.socket.on('user-joined', (user: any) => {
+      console.log('User joined:', user.name);
+      this.createAvatar(user.id, user.name, user.position, user.rotation);
+    });
+
+    this.socket.on('user-moved', (data: any) => {
+      const avatar = this.avatars.get(data.id);
+      if (avatar) {
+        avatar.updatePosition(data.position);
+        avatar.updateRotation(data.rotation);
+      }
+    });
+
+    this.socket.on('user-left', (userId: string) => {
+      console.log('User left:', userId);
+      this.removeAvatar(userId);
+    });
+
+    this.socket.on('object-moved', (data: any) => {
+      // Handle shared object movement
+      const obj = this.scene.getObjectByName(data.objectName);
+      if (obj) {
+        obj.position.set(data.position.x, data.position.y, data.position.z);
+      }
+    });
+  }
+
+  private createAvatar(userId: string, userName: string, position: any, rotation: any) {
+    const avatar = new Avatar(userId, userName);
+    avatar.updatePosition(position);
+    avatar.updateRotation(rotation);
+    this.avatars.set(userId, avatar);
+    this.scene.add(avatar.mesh);
+  }
+
+  private removeAvatar(userId: string) {
+    const avatar = this.avatars.get(userId);
+    if (avatar) {
+      this.scene.remove(avatar.mesh);
+      this.avatars.delete(userId);
+    }
+  }
+
+  updateLocalPosition() {
+    const pos = this.localCamera.position;
+    const rot = this.localCamera.rotation;
+    this.socket.emit('update-position', {
+      position: { x: pos.x, y: pos.y, z: pos.z },
+      rotation: { x: rot.x, y: rot.y, z: rot.z },
+    });
+  }
+
+  broadcastObjectMove(objectName: string, position: THREE.Vector3) {
+    this.socket.emit('object-moved', {
+      objectName,
+      position: { x: position.x, y: position.y, z: position.z },
+    });
+  }
+}
+```
+
+---
+
+### 6. Update `src/main.ts` (Week 6 version)
+
+```ts
+// src/main.ts (Week 6)
+import * as THREE from 'three';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { setupScene } from './scene/setupScene';
+import { createMultipleObjects } from './scene/createMultipleObjects';
+import { setupResizeHandler } from './utils/resizeHandler';
+import { NetworkManager } from './networking/NetworkManager';
+
+function main() {
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+  document.body.appendChild(VRButton.createButton(renderer));
+
+  const { scene, camera } = setupScene();
+  const objects = createMultipleObjects(scene);
+
+  // Initialize networking
+  const networkManager = new NetworkManager(scene, camera);
+
+  setupResizeHandler(camera, renderer);
+
+  const clock = new THREE.Clock();
+  let lastNetworkUpdate = 0;
+
+  renderer.setAnimationLoop(() => {
+    const time = clock.getElapsedTime();
+
+    // Send position updates every 100ms
+    if (time - lastNetworkUpdate > 0.1) {
+      networkManager.updateLocalPosition();
+      lastNetworkUpdate = time;
+    }
+
+    renderer.render(scene, camera);
+  });
+}
+
+main();
+```
+
+---
+
+### 7. Running the server
+
+Add to `package.json`:
+```json
+"scripts": {
+  "dev": "vite",
+  "server": "node server/server.js",
+  "dev:all": "concurrently \"npm run dev\" \"npm run server\""
+}
+```
+
+Install concurrently:
+```bash
+npm install -D concurrently
+```
+
+Then run: `npm run dev:all`
+
+---
+
+### 8. Cursor prompt (Week 6)
+
+```text
+Extend the WebXR TS project to support multi-user networking.
+
+Requirements:
+- create server/server.js using Socket.io for WebSocket communication
+- add src/networking/NetworkManager.ts to handle socket events
+- add src/networking/Avatar.ts to represent remote users
+- implement position/rotation broadcasting every 100ms
+- handle user join/leave events
+- create simple avatar meshes (sphere head + cylinder body) with name labels
+- update main.ts to initialize NetworkManager
+- broadcast local camera position to other users
+- keep the project modular
+```
+
+---
+
+## Week 7 – Asset Pipeline & Optimization
+
+### Goal
+
+Load **realistic 3D models** (GLTF/GLB) and optimize the scene for **smooth performance** on XR devices.
+
+### What you will learn
+
+* Loading and parsing GLTF/GLB models
+* Asset management and caching
+* Level of Detail (LOD) techniques
+* Draw call optimization (instancing, merging)
+* Texture compression and optimization
+* Performance profiling for XR (90fps target)
+
+### Expected result
+
+* Load complex GLTF models instead of primitive shapes
+* Implement LOD for distant objects
+* Reduce draw calls from 100+ to <50
+* Maintain 72-90 FPS on Quest devices
+* Loading screen with progress indicator
+
+---
+
+### 1. Install GLTF loader (included in Three.js)
+
+No extra dependencies needed! GLTFLoader is in Three.js examples.
+
+---
+
+### 2. New folders / files
+
+```text
+src/
+  assets/
+    AssetManager.ts
+    GLTFModelLoader.ts
+  optimization/
+    LODManager.ts
+    DrawCallOptimizer.ts
+  ui/
+    LoadingScreen.ts
+public/
+  models/
+    (place your .gltf/.glb files here)
+```
+
+---
+
+### 3. `src/assets/GLTFModelLoader.ts`
+
+```ts
+// src/assets/GLTFModelLoader.ts
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
+
+export class GLTFModelLoader {
+  private loader: GLTFLoader;
+  private dracoLoader: DRACOLoader;
+
+  constructor() {
+    this.loader = new GLTFLoader();
+    
+    // Optional: Enable Draco compression for smaller files
+    this.dracoLoader = new DRACOLoader();
+    this.dracoLoader.setDecoderPath('https://www.gstatic.com/draco/v1/decoders/');
+    this.loader.setDRACOLoader(this.dracoLoader);
+  }
+
+  async load(url: string, onProgress?: (progress: number) => void): Promise<THREE.Group> {
+    return new Promise((resolve, reject) => {
+      this.loader.load(
+        url,
+        (gltf) => {
+          resolve(gltf.scene);
+        },
+        (xhr) => {
+          const progress = (xhr.loaded / xhr.total) * 100;
+          if (onProgress) onProgress(progress);
+        },
+        reject
+      );
+    });
+  }
+
+  dispose() {
+    this.dracoLoader.dispose();
+  }
+}
+```
+
+---
+
+### 4. `src/assets/AssetManager.ts`
+
+```ts
+// src/assets/AssetManager.ts
+import * as THREE from 'three';
+import { GLTFModelLoader } from './GLTFModelLoader';
+
+export class AssetManager {
+  private modelLoader: GLTFModelLoader;
+  private cache: Map<string, THREE.Group> = new Map();
+  private textureLoader: THREE.TextureLoader;
+
+  constructor() {
+    this.modelLoader = new GLTFModelLoader();
+    this.textureLoader = new THREE.TextureLoader();
+  }
+
+  async loadModel(
+    name: string,
+    url: string,
+    onProgress?: (progress: number) => void
+  ): Promise<THREE.Group> {
+    // Check cache first
+    if (this.cache.has(name)) {
+      return this.cache.get(name)!.clone();
+    }
+
+    const model = await this.modelLoader.load(url, onProgress);
+    this.cache.set(name, model);
+    return model.clone();
+  }
+
+  async loadTexture(url: string): Promise<THREE.Texture> {
+    return new Promise((resolve, reject) => {
+      this.textureLoader.load(url, resolve, undefined, reject);
+    });
+  }
+
+  preloadAssets(assets: { name: string; url: string }[]): Promise<void[]> {
+    const promises = assets.map((asset) => this.loadModel(asset.name, asset.url));
+    return Promise.all(promises);
+  }
+
+  getCachedModel(name: string): THREE.Group | undefined {
+    const model = this.cache.get(name);
+    return model ? model.clone() : undefined;
+  }
+
+  dispose() {
+    this.cache.clear();
+    this.modelLoader.dispose();
+  }
+}
+```
+
+---
+
+### 5. `src/optimization/LODManager.ts`
+
+```ts
+// src/optimization/LODManager.ts
+import * as THREE from 'three';
+
+export class LODManager {
+  createLOD(
+    highDetail: THREE.Object3D,
+    mediumDetail: THREE.Object3D,
+    lowDetail: THREE.Object3D
+  ): THREE.LOD {
+    const lod = new THREE.LOD();
+    
+    lod.addLevel(highDetail, 0);    // 0-10 units
+    lod.addLevel(mediumDetail, 10); // 10-30 units
+    lod.addLevel(lowDetail, 30);    // 30+ units
+
+    return lod;
+  }
+
+  // Simplify mesh by reducing geometry
+  simplifyMesh(mesh: THREE.Mesh, targetRatio = 0.5): THREE.Mesh {
+    if (!mesh.geometry) return mesh;
+
+    // Simple approach: create lower poly version
+    // For production, use libraries like three-simplify or SimplifyModifier
+    const geometry = mesh.geometry.clone();
+    
+    // This is a placeholder - in production use proper decimation
+    const simplified = new THREE.Mesh(geometry, mesh.material);
+    simplified.scale.copy(mesh.scale);
+    
+    return simplified;
+  }
+
+  autoGenerateLOD(object: THREE.Object3D): THREE.LOD {
+    const lod = new THREE.LOD();
+    
+    const high = object.clone();
+    const medium = object.clone();
+    const low = object.clone();
+
+    // Scale down for simple LOD effect
+    medium.scale.multiplyScalar(0.8);
+    low.scale.multiplyScalar(0.5);
+
+    lod.addLevel(high, 0);
+    lod.addLevel(medium, 15);
+    lod.addLevel(low, 40);
+
+    return lod;
+  }
+}
+```
+
+---
+
+### 6. `src/optimization/DrawCallOptimizer.ts`
+
+```ts
+// src/optimization/DrawCallOptimizer.ts
+import * as THREE from 'three';
+
+export class DrawCallOptimizer {
+  // Merge multiple meshes with same material into one
+  mergeGeometries(meshes: THREE.Mesh[]): THREE.Mesh | null {
+    if (meshes.length === 0) return null;
+
+    const geometries: THREE.BufferGeometry[] = [];
+    const material = meshes[0].material;
+
+    meshes.forEach((mesh) => {
+      const geo = mesh.geometry.clone();
+      geo.applyMatrix4(mesh.matrixWorld);
+      geometries.push(geo);
+    });
+
+    const mergedGeometry = THREE.BufferGeometryUtils.mergeGeometries(geometries);
+    if (!mergedGeometry) return null;
+
+    return new THREE.Mesh(mergedGeometry, material);
+  }
+
+  // Create instanced mesh for repeated objects
+  createInstancedMesh(
+    geometry: THREE.BufferGeometry,
+    material: THREE.Material,
+    positions: THREE.Vector3[]
+  ): THREE.InstancedMesh {
+    const count = positions.length;
+    const instancedMesh = new THREE.InstancedMesh(geometry, material, count);
+
+    const matrix = new THREE.Matrix4();
+    positions.forEach((pos, i) => {
+      matrix.setPosition(pos);
+      instancedMesh.setMatrixAt(i, matrix);
+    });
+
+    instancedMesh.instanceMatrix.needsUpdate = true;
+    return instancedMesh;
+  }
+
+  // Get draw call count (for debugging)
+  getDrawCallCount(renderer: THREE.WebGLRenderer): number {
+    return renderer.info.render.calls;
+  }
+
+  // Print performance stats
+  logPerformanceStats(renderer: THREE.WebGLRenderer) {
+    const info = renderer.info;
+    console.log('=== Render Stats ===');
+    console.log('Draw Calls:', info.render.calls);
+    console.log('Triangles:', info.render.triangles);
+    console.log('Points:', info.render.points);
+    console.log('Lines:', info.render.lines);
+    console.log('Textures:', info.memory.textures);
+    console.log('Geometries:', info.memory.geometries);
+  }
+}
+```
+
+---
+
+### 7. `src/ui/LoadingScreen.ts`
+
+```ts
+// src/ui/LoadingScreen.ts
+export class LoadingScreen {
+  private container: HTMLDivElement;
+  private progressBar: HTMLDivElement;
+  private progressText: HTMLDivElement;
+
+  constructor() {
+    this.container = document.createElement('div');
+    this.container.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    `;
+
+    this.progressText = document.createElement('div');
+    this.progressText.style.cssText = `
+      color: white;
+      font-size: 24px;
+      margin-bottom: 20px;
+    `;
+    this.progressText.textContent = 'Loading... 0%';
+
+    this.progressBar = document.createElement('div');
+    this.progressBar.style.cssText = `
+      width: 300px;
+      height: 20px;
+      background: #333;
+      border-radius: 10px;
+      overflow: hidden;
+    `;
+
+    const progressFill = document.createElement('div');
+    progressFill.id = 'progress-fill';
+    progressFill.style.cssText = `
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #00aaff, #00ff88);
+      transition: width 0.3s;
+    `;
+
+    this.progressBar.appendChild(progressFill);
+    this.container.appendChild(this.progressText);
+    this.container.appendChild(this.progressBar);
+    document.body.appendChild(this.container);
+  }
+
+  updateProgress(progress: number) {
+    const fill = document.getElementById('progress-fill');
+    if (fill) {
+      fill.style.width = `${progress}%`;
+      this.progressText.textContent = `Loading... ${Math.round(progress)}%`;
+    }
+  }
+
+  hide() {
+    this.container.style.display = 'none';
+  }
+
+  show() {
+    this.container.style.display = 'flex';
+  }
+
+  remove() {
+    document.body.removeChild(this.container);
+  }
+}
+```
+
+---
+
+### 8. Update `src/main.ts` (Week 7 version)
+
+```ts
+// src/main.ts (Week 7)
+import * as THREE from 'three';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { setupScene } from './scene/setupScene';
+import { setupResizeHandler } from './utils/resizeHandler';
+import { AssetManager } from './assets/AssetManager';
+import { LODManager } from './optimization/LODManager';
+import { DrawCallOptimizer } from './optimization/DrawCallOptimizer';
+import { LoadingScreen } from './ui/LoadingScreen';
+
+async function main() {
+  const loadingScreen = new LoadingScreen();
+  
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+  document.body.appendChild(VRButton.createButton(renderer));
+
+  const { scene, camera } = setupScene();
+  const assetManager = new AssetManager();
+  const lodManager = new LODManager();
+  const optimizer = new DrawCallOptimizer();
+
+  try {
+    // Load assets with progress
+    loadingScreen.updateProgress(10);
+    
+    // Example: Load a GLTF model
+    // const model = await assetManager.loadModel(
+    //   'room',
+    //   '/models/room.glb',
+    //   (progress) => loadingScreen.updateProgress(10 + progress * 0.8)
+    // );
+    // scene.add(model);
+
+    // For demo: create some objects with LOD
+    const geometry = new THREE.BoxGeometry(1, 1, 1);
+    const material = new THREE.MeshStandardMaterial({ color: 0x00aaff });
+    
+    for (let i = 0; i < 5; i++) {
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(i * 3 - 6, 1, -5);
+      const lod = lodManager.autoGenerateLOD(mesh);
+      scene.add(lod);
+    }
+
+    loadingScreen.updateProgress(100);
+    setTimeout(() => loadingScreen.remove(), 500);
+
+  } catch (error) {
+    console.error('Error loading assets:', error);
+    loadingScreen.remove();
+  }
+
+  setupResizeHandler(camera, renderer);
+
+  const clock = new THREE.Clock();
+  let frameCount = 0;
+
+  renderer.setAnimationLoop(() => {
+    frameCount++;
+    
+    // Log performance stats every 300 frames (~5 seconds at 60fps)
+    if (frameCount % 300 === 0) {
+      optimizer.logPerformanceStats(renderer);
+    }
+
+    renderer.render(scene, camera);
+  });
+}
+
+main();
+```
+
+---
+
+### 9. Cursor prompt (Week 7)
+
+```text
+Extend the WebXR TS project to support GLTF asset loading and performance optimization.
+
+Requirements:
+- add src/assets/GLTFModelLoader.ts using GLTFLoader with Draco support
+- add src/assets/AssetManager.ts for caching and managing loaded assets
+- add src/optimization/LODManager.ts for Level of Detail management
+- add src/optimization/DrawCallOptimizer.ts for merging geometries and instancing
+- add src/ui/LoadingScreen.ts with progress bar
+- update main.ts to load assets with loading screen
+- implement LOD for multiple objects in scene
+- log performance stats (draw calls, triangles) periodically
+- keep the project modular
+```
+
+---
+
+## Week 8 – UX & Accessibility in XR
+
+### Goal
+
+Implement **best practices** for comfort, usability, and accessibility in XR experiences.
+
+### What you will learn
+
+* Motion comfort techniques (vignetting, teleportation)
+* Gaze-based UI for controller-free interaction
+* Accessibility: colorblind modes, text scaling, audio cues
+* Performance targets for different devices
+* UX patterns: onboarding, tutorials, error handling
+
+### Expected result
+
+* Smooth locomotion options (teleport + smooth movement)
+* Comfort vignette during movement
+* Gaze cursor for UI interaction
+* Configurable accessibility settings
+* Tutorial overlay for first-time users
+
+---
+
+### 1. New folders / files
+
+```text
+src/
+  locomotion/
+    TeleportController.ts
+    SmoothLocomotion.ts
+  comfort/
+    VignetteEffect.ts
+    ComfortSettings.ts
+  accessibility/
+    AccessibilityManager.ts
+    GazeController.ts
+  tutorial/
+    TutorialManager.ts
+```
+
+---
+
+### 2. `src/locomotion/TeleportController.ts`
+
+```ts
+// src/locomotion/TeleportController.ts
+import * as THREE from 'three';
+
+export class TeleportController {
+  private scene: THREE.Scene;
+  private camera: THREE.PerspectiveCamera;
+  private marker: THREE.Mesh;
+  private raycaster: THREE.Raycaster;
+  private isActive = false;
+
+  constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
+    this.scene = scene;
+    this.camera = camera;
+    this.raycaster = new THREE.Raycaster();
+
+    // Create teleport marker
+    const geometry = new THREE.CircleGeometry(0.5, 32);
+    const material = new THREE.MeshBasicMaterial({ 
+      color: 0x00ff00, 
+      transparent: true, 
+      opacity: 0.5 
+    });
+    this.marker = new THREE.Mesh(geometry, material);
+    this.marker.rotation.x = -Math.PI / 2;
+    this.marker.visible = false;
+    this.scene.add(this.marker);
+  }
+
+  showMarker(position: THREE.Vector3) {
+    this.marker.position.copy(position);
+    this.marker.visible = true;
+  }
+
+  hideMarker() {
+    this.marker.visible = false;
+  }
+
+  teleport(position: THREE.Vector3) {
+    // Keep camera height, only move X and Z
+    this.camera.position.x = position.x;
+    this.camera.position.z = position.z;
+    this.hideMarker();
+  }
+
+  update(controller: THREE.Group, ground: THREE.Object3D) {
+    const tempMatrix = new THREE.Matrix4();
+    tempMatrix.identity().extractRotation(controller.matrixWorld);
+
+    const origin = controller.position.clone();
+    const direction = new THREE.Vector3(0, 0, -1).applyMatrix4(tempMatrix);
+
+    this.raycaster.set(origin, direction);
+    const intersects = this.raycaster.intersectObject(ground, true);
+
+    if (intersects.length > 0) {
+      this.showMarker(intersects[0].point);
+      return intersects[0].point;
+    } else {
+      this.hideMarker();
+      return null;
+    }
+  }
+}
+```
+
+---
+
+### 3. `src/comfort/VignetteEffect.ts`
+
+```ts
+// src/comfort/VignetteEffect.ts
+import * as THREE from 'three';
+
+export class VignetteEffect {
+  private material: THREE.ShaderMaterial;
+  private mesh: THREE.Mesh;
+  private targetIntensity = 0;
+  private currentIntensity = 0;
+
+  constructor(camera: THREE.PerspectiveCamera) {
+    const geometry = new THREE.PlaneGeometry(2, 2);
+    
+    this.material = new THREE.ShaderMaterial({
+      transparent: true,
+      depthTest: false,
+      depthWrite: false,
+      vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float intensity;
+        varying vec2 vUv;
+        
+        void main() {
+          vec2 center = vec2(0.5);
+          float dist = distance(vUv, center);
+          float vignette = smoothstep(0.3, 1.0, dist);
+          gl_FragColor = vec4(0.0, 0.0, 0.0, vignette * intensity);
+        }
+      `,
+      uniforms: {
+        intensity: { value: 0.0 }
+      }
+    });
+
+    this.mesh = new THREE.Mesh(geometry, this.material);
+    this.mesh.frustumCulled = false;
+    this.mesh.renderOrder = 999;
+    
+    camera.add(this.mesh);
+    this.mesh.position.z = -0.1;
+  }
+
+  setIntensity(value: number) {
+    this.targetIntensity = THREE.MathUtils.clamp(value, 0, 1);
+  }
+
+  update(delta: number) {
+    // Smooth transition
+    this.currentIntensity = THREE.MathUtils.lerp(
+      this.currentIntensity,
+      this.targetIntensity,
+      delta * 5
+    );
+    this.material.uniforms.intensity.value = this.currentIntensity;
+  }
+}
+```
+
+---
+
+### 4. `src/accessibility/AccessibilityManager.ts`
+
+```ts
+// src/accessibility/AccessibilityManager.ts
+import * as THREE from 'three';
+
+export type AccessibilitySettings = {
+  colorblindMode: 'none' | 'protanopia' | 'deuteranopia' | 'tritanopia';
+  textScale: number;
+  audioDescriptions: boolean;
+  reducedMotion: boolean;
+  highContrast: boolean;
+};
+
+export class AccessibilityManager {
+  private settings: AccessibilitySettings = {
+    colorblindMode: 'none',
+    textScale: 1.0,
+    audioDescriptions: false,
+    reducedMotion: false,
+    highContrast: false,
+  };
+
+  constructor() {
+    this.loadSettings();
+  }
+
+  private loadSettings() {
+    const saved = localStorage.getItem('accessibility-settings');
+    if (saved) {
+      this.settings = { ...this.settings, ...JSON.parse(saved) };
+    }
+  }
+
+  saveSettings() {
+    localStorage.setItem('accessibility-settings', JSON.stringify(this.settings));
+  }
+
+  setColorblindMode(mode: AccessibilitySettings['colorblindMode']) {
+    this.settings.colorblindMode = mode;
+    this.saveSettings();
+  }
+
+  setTextScale(scale: number) {
+    this.settings.textScale = THREE.MathUtils.clamp(scale, 0.5, 2.0);
+    this.saveSettings();
+  }
+
+  setReducedMotion(enabled: boolean) {
+    this.settings.reducedMotion = enabled;
+    this.saveSettings();
+  }
+
+  getSettings(): AccessibilitySettings {
+    return { ...this.settings };
+  }
+
+  // Apply color filter for colorblind mode
+  applyColorblindFilter(color: THREE.Color): THREE.Color {
+    if (this.settings.colorblindMode === 'none') return color;
+
+    // Simplified colorblind simulation
+    const rgb = { r: color.r, g: color.g, b: color.b };
+
+    switch (this.settings.colorblindMode) {
+      case 'protanopia': // Red-blind
+        return new THREE.Color(
+          0.567 * rgb.r + 0.433 * rgb.g,
+          0.558 * rgb.r + 0.442 * rgb.g,
+          0.242 * rgb.g + 0.758 * rgb.b
+        );
+      case 'deuteranopia': // Green-blind
+        return new THREE.Color(
+          0.625 * rgb.r + 0.375 * rgb.g,
+          0.7 * rgb.r + 0.3 * rgb.g,
+          0.3 * rgb.g + 0.7 * rgb.b
+        );
+      case 'tritanopia': // Blue-blind
+        return new THREE.Color(
+          0.95 * rgb.r + 0.05 * rgb.g,
+          0.433 * rgb.g + 0.567 * rgb.b,
+          0.475 * rgb.g + 0.525 * rgb.b
+        );
+      default:
+        return color;
+    }
+  }
+}
+```
+
+---
+
+### 5. `src/accessibility/GazeController.ts`
+
+```ts
+// src/accessibility/GazeController.ts
+import * as THREE from 'three';
+
+export class GazeController {
+  private raycaster: THREE.Raycaster;
+  private cursor: THREE.Mesh;
+  private gazeDuration = 0;
+  private gazeThreshold = 2.0; // seconds to activate
+  private currentTarget: THREE.Object3D | null = null;
+  private onGazeSelect?: (object: THREE.Object3D) => void;
+
+  constructor(scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
+    this.raycaster = new THREE.Raycaster();
+
+    // Create gaze cursor
+    const geometry = new THREE.RingGeometry(0.015, 0.02, 32);
+    const material = new THREE.MeshBasicMaterial({ 
+      color: 0xffffff, 
+      transparent: true,
+      opacity: 0.8
+    });
+    this.cursor = new THREE.Mesh(geometry, material);
+    camera.add(this.cursor);
+    this.cursor.position.z = -1;
+  }
+
+  setOnGazeSelect(callback: (object: THREE.Object3D) => void) {
+    this.onGazeSelect = callback;
+  }
+
+  update(camera: THREE.PerspectiveCamera, interactables: THREE.Object3D[], delta: number) {
+    // Raycast from center of view
+    this.raycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+    const intersects = this.raycaster.intersectObjects(interactables, true);
+
+    if (intersects.length > 0) {
+      const target = intersects[0].object;
+
+      if (target === this.currentTarget) {
+        // Continue gazing at same object
+        this.gazeDuration += delta;
+        
+        // Visual feedback: scale cursor based on gaze progress
+        const progress = Math.min(this.gazeDuration / this.gazeThreshold, 1);
+        this.cursor.scale.setScalar(1 + progress * 0.5);
+        (this.cursor.material as THREE.MeshBasicMaterial).color.setHex(
+          progress < 1 ? 0xffffff : 0x00ff00
+        );
+
+        // Trigger selection
+        if (this.gazeDuration >= this.gazeThreshold && this.onGazeSelect) {
+          this.onGazeSelect(target);
+          this.gazeDuration = 0;
+        }
+      } else {
+        // New target
+        this.currentTarget = target;
+        this.gazeDuration = 0;
+        this.cursor.scale.setScalar(1);
+      }
+    } else {
+      // No target
+      this.currentTarget = null;
+      this.gazeDuration = 0;
+      this.cursor.scale.setScalar(1);
+      (this.cursor.material as THREE.MeshBasicMaterial).color.setHex(0xffffff);
+    }
+  }
+}
+```
+
+---
+
+### 6. `src/tutorial/TutorialManager.ts`
+
+```ts
+// src/tutorial/TutorialManager.ts
+export class TutorialManager {
+  private steps: string[] = [];
+  private currentStep = 0;
+  private overlay: HTMLDivElement;
+  private onComplete?: () => void;
+
+  constructor(steps: string[]) {
+    this.steps = steps;
+
+    this.overlay = document.createElement('div');
+    this.overlay.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.8);
+      color: white;
+      padding: 20px 30px;
+      border-radius: 10px;
+      font-size: 18px;
+      max-width: 600px;
+      text-align: center;
+      z-index: 1000;
+    `;
+  }
+
+  start(onComplete?: () => void) {
+    this.onComplete = onComplete;
+    this.currentStep = 0;
+    this.showStep();
+    document.body.appendChild(this.overlay);
+  }
+
+  private showStep() {
+    if (this.currentStep < this.steps.length) {
+      this.overlay.innerHTML = `
+        <div>${this.steps[this.currentStep]}</div>
+        <div style="margin-top: 15px; font-size: 14px; color: #888;">
+          Step ${this.currentStep + 1} of ${this.steps.length}
+        </div>
+      `;
+    } else {
+      this.complete();
+    }
+  }
+
+  nextStep() {
+    this.currentStep++;
+    if (this.currentStep < this.steps.length) {
+      this.showStep();
+    } else {
+      this.complete();
+    }
+  }
+
+  private complete() {
+    document.body.removeChild(this.overlay);
+    if (this.onComplete) {
+      this.onComplete();
+    }
+  }
+
+  skip() {
+    this.complete();
+  }
+}
+```
+
+---
+
+### 7. Update `src/main.ts` (Week 8 version)
+
+```ts
+// src/main.ts (Week 8)
+import * as THREE from 'three';
+import { VRButton } from 'three/examples/jsm/webxr/VRButton.js';
+import { setupScene } from './scene/setupScene';
+import { createMultipleObjects } from './scene/createMultipleObjects';
+import { setupResizeHandler } from './utils/resizeHandler';
+import { TeleportController } from './locomotion/TeleportController';
+import { VignetteEffect } from './comfort/VignetteEffect';
+import { AccessibilityManager } from './accessibility/AccessibilityManager';
+import { GazeController } from './accessibility/GazeController';
+import { TutorialManager } from './tutorial/TutorialManager';
+
+function main() {
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.xr.enabled = true;
+  document.body.appendChild(renderer.domElement);
+  document.body.appendChild(VRButton.createButton(renderer));
+
+  const { scene, camera } = setupScene();
+  const objects = createMultipleObjects(scene);
+
+  // Add ground for teleportation
+  const groundGeo = new THREE.PlaneGeometry(20, 20);
+  const groundMat = new THREE.MeshStandardMaterial({ color: 0x808080 });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.name = 'ground';
+  scene.add(ground);
+
+  // Initialize systems
+  const teleportController = new TeleportController(scene, camera);
+  const vignetteEffect = new VignetteEffect(camera);
+  const accessibilityManager = new AccessibilityManager();
+  const gazeController = new GazeController(scene, camera);
+
+  // Tutorial
+  const tutorial = new TutorialManager([
+    '👀 Look around to explore the scene',
+    '🎮 Use your controller to interact with objects',
+    '✨ Gaze at objects for 2 seconds to select them',
+    '🚀 Point at the ground and trigger to teleport',
+    '⚙️ Press Menu for accessibility settings'
+  ]);
+
+  // Start tutorial on first visit
+  if (!localStorage.getItem('tutorial-completed')) {
+    setTimeout(() => {
+      tutorial.start(() => {
+        localStorage.setItem('tutorial-completed', 'true');
+      });
+    }, 2000);
+  }
+
+  // Gaze interaction
+  gazeController.setOnGazeSelect((object) => {
+    if (object instanceof THREE.Mesh) {
+      const settings = accessibilityManager.getSettings();
+      let newColor = new THREE.Color(Math.random() * 0xffffff);
+      newColor = accessibilityManager.applyColorblindFilter(newColor);
+      (object.material as THREE.MeshStandardMaterial).color.copy(newColor);
+    }
+  });
+
+  // Controller for teleportation
+  const controller = renderer.xr.getController(0);
+  controller.addEventListener('selectstart', () => {
+    const pos = teleportController.update(controller, ground);
+    if (pos) {
+      teleportController.teleport(pos);
+      vignetteEffect.setIntensity(0.7); // Show vignette during teleport
+      setTimeout(() => vignetteEffect.setIntensity(0), 300);
+    }
+  });
+  scene.add(controller);
+
+  setupResizeHandler(camera, renderer);
+
+  const clock = new THREE.Clock();
+  renderer.setAnimationLoop(() => {
+    const delta = clock.getDelta();
+    
+    vignetteEffect.update(delta);
+    gazeController.update(camera, objects, delta);
+    teleportController.update(controller, ground);
+    
+    renderer.render(scene, camera);
+  });
+}
+
+main();
+```
+
+---
+
+### 8. Cursor prompt (Week 8)
+
+```text
+Extend the WebXR TS project with UX and accessibility features.
+
+Requirements:
+- add src/locomotion/TeleportController.ts for teleportation with ground marker
+- add src/comfort/VignetteEffect.ts for motion comfort vignette shader
+- add src/accessibility/AccessibilityManager.ts with colorblind modes and settings
+- add src/accessibility/GazeController.ts for gaze-based interaction (2s dwell time)
+- add src/tutorial/TutorialManager.ts for onboarding steps
+- update main.ts to integrate all systems
+- show tutorial overlay on first visit
+- implement gaze selection with visual feedback on cursor
+- apply vignette during teleportation for comfort
+- keep the project modular
 ```
 
 ---

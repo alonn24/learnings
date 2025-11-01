@@ -109,6 +109,169 @@
 
 ---
 
+## Week 5 – Spatial Audio & Voice Commands ⏳
+
+**Goal**: Add immersive audio to the scene and enable voice-based interaction for hands-free control.
+
+### Tasks:
+- [ ] Create `src/audio/` folder
+- [ ] Create `src/audio/AudioManager.ts`
+  - [ ] Set up THREE.AudioListener on camera
+  - [ ] Implement loadSound method for loading audio files
+  - [ ] Implement playSound/stopSound methods
+  - [ ] Create procedural beep feedback using Web Audio API
+- [ ] Create `src/audio/SpatialAudioSource.ts`
+  - [ ] Set up THREE.PositionalAudio
+  - [ ] Configure distance model and rolloff
+  - [ ] Attach audio to mesh objects
+- [ ] Create `src/voice/` folder
+- [ ] Create `src/voice/VoiceCommandManager.ts`
+  - [ ] Implement Web Speech API (SpeechRecognition)
+  - [ ] Register voice commands
+  - [ ] Process transcript and trigger actions
+  - [ ] Handle browser compatibility
+- [ ] Update `src/main.ts` (Week 5 version)
+  - [ ] Initialize AudioManager
+  - [ ] Initialize VoiceCommandManager
+  - [ ] Register commands: "add cube", "change color red", "save scene"
+  - [ ] Add button to start voice recognition (requires user gesture)
+  - [ ] Add audio feedback beeps to menu actions
+- [ ] Test: Voice commands trigger correct actions
+- [ ] Test: Audio feedback plays on interactions
+
+**Expected Result**: Voice-controlled scene manipulation with audio feedback
+
+---
+
+## Week 6 – Networking & Multi-user XR ⏳
+
+**Goal**: Enable multiple users to share the same XR space and interact with shared objects in real-time.
+
+### Tasks:
+- [ ] Install socket.io-client (`npm install socket.io-client @types/socket.io-client`)
+- [ ] Install server dependencies (`npm install socket.io express`)
+- [ ] Install concurrently for running both servers (`npm install -D concurrently`)
+- [ ] Create `server/` folder
+- [ ] Create `server/server.js`
+  - [ ] Set up Express + Socket.io server
+  - [ ] Handle user join/leave events
+  - [ ] Broadcast position/rotation updates
+  - [ ] Handle shared object movement
+- [ ] Create `src/networking/` folder
+- [ ] Create `src/networking/Avatar.ts`
+  - [ ] Create simple avatar mesh (sphere head + cylinder body)
+  - [ ] Add name label sprite above avatar
+  - [ ] Implement position/rotation update methods
+- [ ] Create `src/networking/NetworkManager.ts`
+  - [ ] Connect to Socket.io server
+  - [ ] Handle existing-users, user-joined, user-left events
+  - [ ] Create/remove avatars for remote users
+  - [ ] Broadcast local camera position every 100ms
+  - [ ] Handle shared object synchronization
+- [ ] Update `src/main.ts` (Week 6 version)
+  - [ ] Initialize NetworkManager
+  - [ ] Send position updates in render loop
+- [ ] Add package.json scripts for running server
+- [ ] Test: Multiple browser windows show each other as avatars
+- [ ] Test: Object movement syncs across clients
+
+**Expected Result**: Multi-user XR space with visible avatars and shared interactions
+
+---
+
+## Week 7 – Asset Pipeline & Optimization ⏳
+
+**Goal**: Load realistic 3D models (GLTF/GLB) and optimize scene for smooth performance on XR devices.
+
+### Tasks:
+- [ ] Create `src/assets/` folder
+- [ ] Create `src/assets/GLTFModelLoader.ts`
+  - [ ] Set up GLTFLoader from Three.js examples
+  - [ ] Configure DRACOLoader for compression
+  - [ ] Implement async load with progress callback
+- [ ] Create `src/assets/AssetManager.ts`
+  - [ ] Implement model caching system
+  - [ ] Add texture loading support
+  - [ ] Implement preloadAssets for bulk loading
+  - [ ] Add getCachedModel method for instancing
+- [ ] Create `src/optimization/` folder
+- [ ] Create `src/optimization/LODManager.ts`
+  - [ ] Implement createLOD with multiple detail levels
+  - [ ] Add autoGenerateLOD helper
+  - [ ] Document distance thresholds (0-10, 10-30, 30+ units)
+- [ ] Create `src/optimization/DrawCallOptimizer.ts`
+  - [ ] Implement geometry merging
+  - [ ] Implement instanced mesh creation
+  - [ ] Add performance stats logging
+  - [ ] Add getDrawCallCount helper
+- [ ] Update `src/ui/LoadingScreen.ts`
+  - [ ] Create progress bar overlay
+  - [ ] Update progress percentage display
+  - [ ] Implement show/hide/remove methods
+- [ ] Create `public/models/` folder for GLTF assets
+- [ ] Update `src/main.ts` (Week 7 version)
+  - [ ] Initialize AssetManager and optimizers
+  - [ ] Show loading screen during asset loading
+  - [ ] Create LOD objects for distant objects
+  - [ ] Log performance stats periodically
+- [ ] Test: GLTF models load with progress indicator
+- [ ] Test: LOD switches at different distances
+- [ ] Test: Draw calls reduced significantly
+
+**Expected Result**: Optimized scene with GLTF models, LOD, and <50 draw calls maintaining 72-90 FPS
+
+---
+
+## Week 8 – UX & Accessibility in XR ⏳
+
+**Goal**: Implement best practices for comfort, usability, and accessibility in XR experiences.
+
+### Tasks:
+- [ ] Create `src/locomotion/` folder
+- [ ] Create `src/locomotion/TeleportController.ts`
+  - [ ] Create teleport marker mesh
+  - [ ] Implement raycasting to ground
+  - [ ] Show/hide marker based on valid targets
+  - [ ] Implement teleport (move camera X/Z, keep Y)
+- [ ] Create `src/comfort/` folder
+- [ ] Create `src/comfort/VignetteEffect.ts`
+  - [ ] Create shader material for vignette effect
+  - [ ] Implement smooth intensity transitions
+  - [ ] Attach vignette plane to camera
+- [ ] Create `src/accessibility/` folder
+- [ ] Create `src/accessibility/AccessibilityManager.ts`
+  - [ ] Define AccessibilitySettings type
+  - [ ] Implement colorblind mode filters (protanopia, deuteranopia, tritanopia)
+  - [ ] Add text scale settings
+  - [ ] Implement localStorage persistence
+  - [ ] Add reduced motion option
+- [ ] Create `src/accessibility/GazeController.ts`
+  - [ ] Create gaze cursor (ring geometry)
+  - [ ] Implement 2-second dwell time activation
+  - [ ] Add visual feedback (scale + color change)
+  - [ ] Raycast from camera center
+- [ ] Create `src/tutorial/` folder
+- [ ] Create `src/tutorial/TutorialManager.ts`
+  - [ ] Create tutorial overlay UI
+  - [ ] Implement multi-step tutorial flow
+  - [ ] Add step counter display
+  - [ ] Check localStorage to show only on first visit
+- [ ] Update `src/main.ts` (Week 8 version)
+  - [ ] Add ground plane for teleportation
+  - [ ] Initialize all UX systems
+  - [ ] Set up tutorial with 5 steps
+  - [ ] Implement gaze selection with colorblind filter
+  - [ ] Add controller teleportation with vignette
+  - [ ] Update all systems in render loop
+- [ ] Test: Teleportation works smoothly with vignette
+- [ ] Test: Gaze selection activates after 2s
+- [ ] Test: Tutorial shows on first visit only
+- [ ] Test: Colorblind filters apply correctly
+
+**Expected Result**: Comfortable, accessible XR experience with teleportation, gaze UI, and tutorial
+
+---
+
 ## Deployment 📦
 
 ### Tasks:
@@ -143,8 +306,10 @@
 
 ## Notes
 
-- **Current Status**: Week 1 Complete ✅
+- **Course Duration**: 8 weeks total
+- **Current Status**: Week 1 Complete ✅ (7 weeks remaining)
 - **Next Step**: Begin Week 2 - Interaction & Controllers
 - **Dev Server**: Running on http://localhost:5173/
 - **XR Testing**: Requires HTTPS and WebXR-capable device (e.g., Meta Quest 3)
+- **Advanced Features**: Weeks 5-8 cover spatial audio, networking, optimization, and accessibility
 
